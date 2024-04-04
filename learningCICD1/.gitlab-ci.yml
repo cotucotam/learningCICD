@@ -1,0 +1,83 @@
+# stages:
+#   - build
+#   - test
+# build the car:
+#   stage: build
+#   script:
+#     - mkdir build
+#     - cd build
+#     - touch car.txt
+#     - echo "chassis" >> car.txt
+#     - echo "engine" >> car.txt
+#     - echo "wheels" >> car.txt
+#   artifacts:
+#     paths:
+#       - build/
+
+# test the car:
+#   stage: test
+#   script:
+#     - test -f build/car.txt
+#     - cd build
+#     - cat car.txt
+#     - grep "chassis" car.txt
+#     - grep "engine" car.txt
+#     - grep "wheels" car.txt
+image: node
+
+stages:
+  - build
+  # - test
+  - deploy
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - static-website/node_modules/
+
+variables:
+  PRODUCTION_DOMAIN: trancotam.surge.sh    
+
+build website:
+  stage: build
+  only:
+    - master
+  script:
+    - echo $CI_COMMIT_SHORT_SHA
+    - cd static-website
+    - npm install
+    - npm install -g gatsby-cli
+    - gatsby build
+    - sed -i "s/%%VERSION%%/$CI_COMMIT_SHORT_SHA/" ./public/index.html
+  artifacts:
+    paths:
+      - ./static-website/public
+
+# test artifact:
+#   image: alpine
+#   stage: test
+#   script:
+#     - grep "Gatsby" ./static-website/public/index.html
+
+# test website:
+#   stage: test
+#   script:
+#     - cd static-website
+#     - npm install
+#     - npm install -g gatsby-cli@2.12.42
+#     - gatsby serve &
+#     - sleep 6
+#     - curl "http://localhost:9000" | tac| tac | grep -q "Gatsby"
+
+
+deploy to surge:
+  stage: deploy
+  when: manual
+  allow_failure: false
+  only:
+    - master
+  script:
+    - npm install --global surge
+    - cd ./static-website/public/
+    - ls
+    - surge --project ./ --domain $PRODUCTION_DOMAIN
